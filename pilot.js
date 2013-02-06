@@ -3,25 +3,19 @@
 
 var pilot = {};
 
+var cache = {
+    handlers: {},
+    data: {}
+};
+
 pilot.start = function () {
     pilot.modules.load();
 };
 
-pilot.data = {};
-
-pilot.events = {
-    handlers: {},
-    off: function (e) {
-        var modules = pilot.modules.instances;
-        for (var x in modules) {
-            modules.hasOwnProperty(x) && modules[x].events.off(e);
-        }
-    },
-    trigger: function (e) {
-        var modules = pilot.modules.instances;
-        for (var x in modules) {
-            modules.hasOwnProperty(x) && modules[x].events.trigger(e, true);
-        }
+pilot.trigger = function (e) {
+    var modules = pilot.modules.instances;
+    for (var x in modules) {
+        modules.hasOwnProperty(x) && modules[x].events.trigger(e, true);
     }
 };
 
@@ -61,8 +55,8 @@ pilot.modules = {
         var module = pilot.modules.loaded[name] = function (id, element) {
             this.id = id;
             this.element = element;
-            this.events = pilot.EventSet(this.id);
-            this.data = pilot.DataSet(this.id);
+            this.events = pilot.Pubsub(id);
+            this.data = pilot.Data(id);
             return this;
         };
         module.prototype = definition();
@@ -72,6 +66,35 @@ pilot.modules = {
             modules = pilot.modules,
             module = modules.loaded[name];
         return modules.instances[id] || (modules.instances[id] = new module(id, element));
+    }
+};
+
+pilot.models = {
+    loaded: {},
+    instances: {},
+    load: function (id) { 
+        pilot.scripts.inject('model/' + name + '.js').then(function () {
+            var model = pilot.models.instantiate(id);
+            model.load && model.load();
+        });
+    },
+    unload: function (id) {
+        delete models.instances[id];
+    },
+    define: function (name, definition) {
+        var model = pilot.models.loaded[name] = function (id) {
+            this.id = id;
+            this.data = pilot.Data(id);
+            this.events = pilot.Pubsub(id);
+            return this;
+        };
+        model.prototype = definition();
+    },
+    instantiate: function (id) {
+        var name = id.split('.')[0],
+            models = pilot.models,
+            model = models.loaded[name];
+        return models.instances[id] || (models.instances[id] = new model(id));
     }
 };
 
@@ -242,16 +265,17 @@ pilot.utils = {
     }
 };
 
-pilot.EventSet = function (id) {
-    if (this instanceof pilot.EventSet) {
+// pilot.Pubsub is an event framework
+pilot.Pubsub = function (id) {
+    if (this instanceof pilot.Pubsub) {
         this.id = id;
-        this.handlers = pilot.events.handlers[id] = pilot.events.handlers[id] || {};
+        this.handlers = cache.handlers[id] = cache.handlers[id] || {};
         return this;
     }
-    return new pilot.EventSet(id);
+    return new pilot.Pubsub(id);
 };
 
-pilot.EventSet.prototype = {
+pilot.Pubsub.prototype = {
     on: function (e, h) {
         e && h && (this.handlers[e] = this.handlers[e] || []).push({handler: h, retain: true});
     },
@@ -259,7 +283,7 @@ pilot.EventSet.prototype = {
         e && h && (this.handlers[e] = this.handlers[e] || []).push({handler: h, retain: false});
     },
     off: function (e) {
-        e ? (delete this.handlers[e], delete handlers[this.id][e]) : (this.handlers = pilot.events.handlers[this.id] = {});
+        e ? (delete this.handlers[e], delete cache.handlers[this.id][e]) : (this.handlers = cache.handlers[this.id] = {});
     },
     trigger: function (e, local) {
         if (local && this.handlers[e]) {
@@ -269,24 +293,25 @@ pilot.EventSet.prototype = {
             !this.handlers[e].length && delete this.handlers[e];
         }
         else if (!local) {
-            pilot.events.trigger(e);
+            pilot.trigger(e);
         }
     },
     destroy: function () {
-        delete pilot.handlers[this.id];
+        delete cache.handlers[this.id];
     }
 };
 
-pilot.DataSet = function (id) {
-    if (this instanceof pilot.DataSet) {
-        this.data = pilot.data[id] = pilot.data[id] || {};
+// pilot.Data is an arbitrary data set
+pilot.Data = function (id) {
+    if (this instanceof pilot.Data) {
+        this.data = cache.data[id] = cache.data[id] || {};
         this.id = id;
         return this;
     }
-    return new pilot.DataSet(id);
+    return new pilot.Data(id);
 };
 
-pilot.DataSet.prototype = {
+pilot.Data.prototype = {
     set: function (k, v) {
         switch (pilot.utils.get_type(k)) {
             case 'string':
@@ -301,13 +326,14 @@ pilot.DataSet.prototype = {
         return k ? this.data[k] : this.data;
     },
     remove: function (k) {
-        k ? (delete this.data[k], delete data[this.id][k]) : (this.data = pilot.data[this.id] = {});
+        k ? (delete this.data[k], delete cache.data[this.id][k]) : (this.data = cache.data[this.id] = {});
     },
     destroy: function () {
-        delete pilot.data[this.id];
+        delete cache.data[this.id];
     }
 };
 
+// pilot.Promise is a promise framework
 pilot.Promise = function () {
     if (this instanceof pilot.Promise) {
         this.handlers = {
