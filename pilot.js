@@ -163,7 +163,10 @@ pilot.Model = function (id) {
         return this;
     }
     else if (!model) {
-        pilot.inject('modules/' + name + '.js');
+        pilot.inject('modules/' + name + '.js').then(function () {
+            var model = pilot.Model(id);
+            model.load && model.load();
+        });
         return models.loaded[name] = new pilot.Model(id);
     }
     return modules.instances[id] || (modules.instances[id] = new model(id));
