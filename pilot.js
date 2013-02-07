@@ -1,109 +1,32 @@
 ;(function (window, undefined) {
 "use strict";
 
-var pilot = {};
-
 var cache = {
     handlers: {},
-    data: {}
-};
-
-pilot.start = function () {
-    pilot.modules.load();
-};
-
-pilot.trigger = function (e) {
-    var modules = pilot.modules.instances;
-    for (var x in modules) {
-        modules.hasOwnProperty(x) && modules[x].events.trigger(e, true);
+    data: {},
+    scripts: {
+        injected: [],
+        injecting: []
+    },
+    modules: {
+        loaded: {},
+        instances: {}
     }
 };
 
-pilot.modules = {
-    loaded: {},
-    instances: {},
-    load: function (context) { 
-        context = !context ? document : 
-            o.tagName ? context :
-            document.querySelectorAll(context);
-        var module_elements = context.getElementsByClassName('module');
-        Array.prototype.forEach.call(module_elements, function (element) {
-            var id = element.getAttribute('data-module'),
-                name = id.split('.')[0],
-                modules = pilot.modules;
-            pilot.scripts.inject('modules/' + name + '.js').then(function () {
-                var module = modules.instantiate(id, element);
-                module.load && module.load();
-            });
-        });
+var pilot = {
+    start: function () {
+        pilot.modules.load();
     },
-    unload: function (context) {
-        context = !context ? document : 
-            o.tagName ? context :
-            document.querySelectorAll(context);
-        var module_elements = context.getElementsByClassName('module');
-        Array.prototype.forEach.call(module_elements, function (element) {
-            var id = element.getAttribute('data-module'),
-                modules = pilot.modules,
-                module = modules.instantiate(id, element);
-            module.unload && module.unload();
-            module.events.destroy();
-            delete modules.instances[id];
-        });
+    trigger: function (e) {
+        var modules = cache.modules.instances;
+        for (var x in modules) {
+            modules.hasOwnProperty(x) && modules[x].events.trigger(e, true);
+        }
     },
-    define: function (name, definition) {
-        var module = pilot.modules.loaded[name] = function (id, element) {
-            this.id = id;
-            this.element = element;
-            this.events = pilot.Pubsub(id);
-            this.data = pilot.Data(id);
-            return this;
-        };
-        module.prototype = definition();
-    },
-    instantiate: function (id, element) {
-        var name = id.split('.')[0],
-            modules = pilot.modules,
-            module = modules.loaded[name];
-        return modules.instances[id] || (modules.instances[id] = new module(id, element));
-    }
-};
-
-pilot.models = {
-    loaded: {},
-    instances: {},
-    load: function (id) { 
-        pilot.scripts.inject('model/' + name + '.js').then(function () {
-            var model = pilot.models.instantiate(id);
-            model.load && model.load();
-        });
-    },
-    unload: function (id) {
-        delete models.instances[id];
-    },
-    define: function (name, definition) {
-        var model = pilot.models.loaded[name] = function (id) {
-            this.id = id;
-            this.data = pilot.Data(id);
-            this.events = pilot.Pubsub(id);
-            return this;
-        };
-        model.prototype = definition();
-    },
-    instantiate: function (id) {
-        var name = id.split('.')[0],
-            models = pilot.models,
-            model = models.loaded[name];
-        return models.instances[id] || (models.instances[id] = new model(id));
-    }
-};
-
-pilot.scripts = {
-    injecting: [],
-    injected: [],
     inject: function (file) {
         var p = pilot.Promise(),
-            scripts = pilot.scripts;
+            scripts = cache.scripts;
         if (scripts.injecting.indexOf(file) > -1) {
             return p;
         }
@@ -134,6 +57,106 @@ pilot.scripts = {
         script.src = file;
         document.head.appendChild(script);
         return p;
+    }
+};
+
+/* 
+pilot.Module = function (id, element) {
+    var name = id.split('.')[0],
+        modules = pilot.modules,
+        module = modules.loaded[name];
+    if (!module) {
+        return pilot.Module.load(id, element);
+    }
+    return modules.instances[id] || (modules.instances[id] = new module(id, element));
+};
+
+pilot.Module.define = function (name, definition) {
+    var module = pilot.modules.loaded[name] = function (id, element) {
+        this.id = id;
+        this.element = element;
+        this.events = pilot.Pubsub(id);
+        this.data = pilot.Data(id);
+        return this;
+    };
+    module.prototype = definition();
+};
+*/
+
+pilot.modules = {
+    load: function (context) { 
+        context = !context ? document : 
+            o.tagName ? context :
+            document.querySelectorAll(context);
+        var module_elements = context.getElementsByClassName('module');
+        Array.prototype.forEach.call(module_elements, function (element) {
+            var id = element.getAttribute('data-module'),
+                name = id.split('.')[0],
+                modules = pilot.modules;
+            pilot.inject('modules/' + name + '.js').then(function () {
+                var module = modules.instantiate(id, element);
+                module.load && module.load();
+            });
+        });
+    },
+    unload: function (context) {
+        context = !context ? document : 
+            o.tagName ? context :
+            document.querySelectorAll(context);
+        var module_elements = context.getElementsByClassName('module');
+        Array.prototype.forEach.call(module_elements, function (element) {
+            var id = element.getAttribute('data-module'),
+                modules = cache.modules,
+                module = modules.instantiate(id, element);
+            module.unload && module.unload();
+            module.events.destroy();
+            delete modules.instances[id];
+        });
+    },
+    define: function (name, definition) {
+        var module = cache.modules.loaded[name] = function (id, element) {
+            this.id = id;
+            this.element = element;
+            this.events = pilot.Pubsub(id);
+            this.data = pilot.Data(id);
+            return this;
+        };
+        module.prototype = definition();
+    },
+    instantiate: function (id, element) {
+        var name = id.split('.')[0],
+            modules = cache.modules,
+            module = modules.loaded[name];
+        return modules.instances[id] || (modules.instances[id] = new module(id, element));
+    }
+};
+
+pilot.models = {
+    loaded: {},
+    instances: {},
+    load: function (id) { 
+        pilot.inject('model/' + name + '.js').then(function () {
+            var model = pilot.models.instantiate(id);
+            model.load && model.load();
+        });
+    },
+    unload: function (id) {
+        delete models.instances[id];
+    },
+    define: function (name, definition) {
+        var model = pilot.models.loaded[name] = function (id) {
+            this.id = id;
+            this.data = pilot.Data(id);
+            this.events = pilot.Pubsub(id);
+            return this;
+        };
+        model.prototype = definition();
+    },
+    instantiate: function (id) {
+        var name = id.split('.')[0],
+            models = pilot.models,
+            model = models.loaded[name];
+        return models.instances[id] || (models.instances[id] = new model(id));
     }
 };
 
