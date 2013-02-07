@@ -23,7 +23,7 @@ var cache = {
 var pilot = {
     start: function () {
         pilot.sync();
-        pilot.refresh();
+        pilot.render();
     },
     trigger: function (e) {
         var modules = cache.modules.instances;
@@ -75,7 +75,7 @@ var pilot = {
         document.head.appendChild(script);
         return p;
     },
-    refresh: function () {
+    render: function () {
         var module_elements = document.getElementsByClassName('module'),
             active_modules = {},
             cached_instances = cache.modules.instances;

@@ -1,4 +1,4 @@
-pilot.models.define('example', function () {
+pilot.Model.define('example', function () {
 
 var model = {
     load: function () {
@@ -15,4 +15,5 @@ var model = {
 };
 
 return model;
+
 });
