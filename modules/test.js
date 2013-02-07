@@ -1,4 +1,4 @@
-pilot.modules.define('test', function () {
+pilot.Module.define('test', function () {
 "use strict";
 
 return {
