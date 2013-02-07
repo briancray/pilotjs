@@ -2,6 +2,7 @@
 "use strict";
 
 var cache = {
+    synced: false,
     handlers: {},
     data: {},
     scripts: {
@@ -16,6 +17,7 @@ var cache = {
 
 var pilot = {
     start: function () {
+        pilot.Data.sync();
         pilot.modules.load();
     },
     trigger: function (e) {
@@ -344,15 +346,29 @@ pilot.Data.prototype = {
                 pilot.utils.extend(this.data[x], k[x]);
                 break;
         }
+        pilot.Data.sync();
     },
     get: function (k) {
         return k ? this.data[k] : this.data;
     },
     remove: function (k) {
         k ? (delete this.data[k], delete cache.data[this.id][k]) : (this.data = cache.data[this.id] = {});
+        pilot.Data.sync();
     },
     destroy: function () {
         delete cache.data[this.id];
+        pilot.Data.sync();
+    }
+};
+
+pilot.Data.sync = function () {
+    if (!cache.synced) {
+        var data = localStorage.getItem('data');
+        data ? (cache.data = pilot.utils.fromJSON(data) || {}) : (cache.data = {});
+        cache.synced = true;
+    }
+    else {
+        localStorage.setItem('data', pilot.utils.toJSON(cache.data));
     }
 };
 

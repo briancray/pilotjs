@@ -7,10 +7,11 @@ return {
         this.display();
         window.setTimeout(function () {
             module.events.trigger('foo');
+            module.data.set('foo', 'bar');
         }, 1000);
     },
     display: function () {
-        this.element.innerHTML = '<b>test</b>';
+        this.element.innerHTML = '<b>' + this.data.get('foo') + '</b>';
     }
 };
 

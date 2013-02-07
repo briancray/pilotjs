@@ -6,7 +6,6 @@ return {
         var module = this;
         module.events.on('foo', function () {
             module.display();
-            module.data.set('foo', 'bar');
         });
     },
     display: function () {
