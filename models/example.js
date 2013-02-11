@@ -1,4 +1,4 @@
-pilot.Model.define('example', function () {
+Pilot.Model.define('example', function () {
 
 var model = {
     load: function () {

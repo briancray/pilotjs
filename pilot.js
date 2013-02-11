@@ -20,10 +20,10 @@ var cache = {
     }
 };
 
-var pilot = {
+var Pilot = {
     start: function () {
-        pilot.sync();
-        pilot.render();
+        Pilot.sync();
+        Pilot.render();
     },
     trigger: function (e) {
         var modules = cache.modules.instances;
@@ -34,15 +34,15 @@ var pilot = {
     sync: function () {
         if (!cache.synced) {
             var data = localStorage.getItem('data');
-            data ? (cache.data = pilot.utils.fromJSON(data) || {}) : (cache.data = {});
+            data ? (cache.data = Pilot.utils.fromJSON(data) || {}) : (cache.data = {});
             cache.synced = true;
         }
         else {
-            localStorage.setItem('data', pilot.utils.toJSON(cache.data));
+            localStorage.setItem('data', Pilot.utils.toJSON(cache.data));
         }
     },
     inject: function (file) {
-        var p = pilot.Promise(),
+        var p = Pilot.Promise(),
             scripts = cache.scripts;
         if (scripts.injecting.indexOf(file) > -1) {
             return p;
@@ -81,7 +81,7 @@ var pilot = {
             cached_instances = cache.modules.instances;
         Array.prototype.forEach.call(module_elements, function (element) {
             var id = element.getAttribute('data-module');
-            active_modules[id] = pilot.Module(id);
+            active_modules[id] = Pilot.Module(id);
         });
         for (var id in cached_instances) {
             if (!active_modules.hasOwnProperty(id)) {
@@ -93,34 +93,34 @@ var pilot = {
                 delete active_modules[id];
             }
         }
-        pilot.trigger('refresh');
+        Pilot.trigger('refresh');
         for (var id in active_modules) {
             active_modules[id].queue('load');
         }
     },
     extend: function (source) {
-        pilot.utils.extend(pilot, source);
+        Pilot.utils.extend(Pilot, source);
     }
 };
 
-pilot.Module = function (id) {
+Pilot.Module = function (id) {
     var name = id.split('.')[0],
         modules = cache.modules,
         module = modules.loaded[name];
-    if (this instanceof pilot.Module) {
+    if (this instanceof Pilot.Module) {
         return this;
     }
     else if (!module) {
-        !modules.loading[name] && pilot.inject('modules/' + name + '.js').then(function () {
-            pilot.Module(id).ready(modules.loading[name].command_queue);
+        !modules.loading[name] && Pilot.inject('modules/' + name + '.js').then(function () {
+            Pilot.Module(id).ready(modules.loading[name].command_queue);
             delete modules.loading[id];
         });
-        return modules.loading[name] || (modules.loading[name] = new pilot.Module(id));
+        return modules.loading[name] || (modules.loading[name] = new Pilot.Module(id));
     }
     return modules.instances[id] || (modules.instances[id] = new module(id));
 };
 
-pilot.Module.prototype = {
+Pilot.Module.prototype = {
     queue: function (method) {
         if (this.method) {
             this.method.apply(this, Array.prototype.slice.call(arguments, 1));
@@ -144,35 +144,35 @@ pilot.Module.prototype = {
     }
 };
 
-pilot.Module.define = function (name, definition) {
+Pilot.Module.define = function (name, definition) {
     var module = cache.modules.loaded[name] = function (id) {
         this.id = id;
         this.element = this.get_element();
-        this.events = pilot.Pubsub(id);
-        this.data = pilot.Data(id);
+        this.events = Pilot.Pubsub(id);
+        this.data = Pilot.Data(id);
         return this;
     };
-    module.prototype = pilot.utils.extend(definition(), pilot.Module.prototype);
+    module.prototype = Pilot.utils.extend(definition(), Pilot.Module.prototype);
 };
 
-pilot.Model = function (id) {
+Pilot.Model = function (id) {
     var name = id.split('.')[0],
         models = cache.models,
         model = models.loaded[name];
-    if (this instanceof pilot.Model) {
+    if (this instanceof Pilot.Model) {
         return this;
     }
     else if (!model) {
-        pilot.inject('modules/' + name + '.js').then(function () {
-            var model = pilot.Model(id);
+        Pilot.inject('modules/' + name + '.js').then(function () {
+            var model = Pilot.Model(id);
             model.load && model.load();
         });
-        return models.loaded[name] = new pilot.Model(id);
+        return models.loaded[name] = new Pilot.Model(id);
     }
     return modules.instances[id] || (modules.instances[id] = new model(id));
 };
 
-pilot.Model.prototype = {
+Pilot.Model.prototype = {
     get: function (k) {
         return this.data.get(k);
     },
@@ -184,17 +184,17 @@ pilot.Model.prototype = {
     }
 };
 
-pilot.Model.define = function (name, definition) {
+Pilot.Model.define = function (name, definition) {
     var model = cache.model.loaded[name] = function (id) {
         this.id = id;
-        this.events = pilot.Pubsub(id);
-        this.data = pilot.Data(id);
+        this.events = Pilot.Pubsub(id);
+        this.data = Pilot.Data(id);
         return this;
     };
-    model.prototype = pilot.utils.extend(definition(), pilot.Model.prototype);
+    model.prototype = Pilot.utils.extend(definition(), Pilot.Model.prototype);
 };
 
-pilot.utils = {
+Pilot.utils = {
     // get the real type of an object in lowercase
     get_type: function (o) {
         return Object.prototype.toString.call(o).split(' ')[1].slice(0, -1).toLowerCase();
@@ -220,7 +220,7 @@ pilot.utils = {
             delta < hour * 2 ? 'An hour ago' :
             delta < day ? delta + ' hours ago' :
             delta < day * 2 ? 'Yesterday' :
-            pilot.utils.format_date(d);
+            Pilot.utils.format_date(d);
     },
 
     // shorten a number -- 1000 becomes 1k, 1000000 becomes 1m, etc.
@@ -322,17 +322,17 @@ pilot.utils = {
     }
 };
 
-// pilot.Pubsub is an event framework
-pilot.Pubsub = function (id) {
-    if (this instanceof pilot.Pubsub) {
+// Pilot.Pubsub is an event framework
+Pilot.Pubsub = function (id) {
+    if (this instanceof Pilot.Pubsub) {
         this.id = id;
         this.handlers = cache.handlers[id] = cache.handlers[id] || {};
         return this;
     }
-    return new pilot.Pubsub(id);
+    return new Pilot.Pubsub(id);
 };
 
-pilot.Pubsub.prototype = {
+Pilot.Pubsub.prototype = {
     on: function (e, h) {
         e && h && (this.handlers[e] = this.handlers[e] || []).push({handler: h, retain: true});
     },
@@ -350,7 +350,7 @@ pilot.Pubsub.prototype = {
             !this.handlers[e].length && delete this.handlers[e];
         }
         else if (!local) {
-            pilot.trigger(e);
+            Pilot.trigger(e);
         }
     },
     destroy: function () {
@@ -358,47 +358,47 @@ pilot.Pubsub.prototype = {
     }
 };
 
-// pilot.Data is an arbitrary data set
-pilot.Data = function (id, is_private) {
-    if (this instanceof pilot.Data) {
+// Pilot.Data is an arbitrary data set
+Pilot.Data = function (id, is_private) {
+    if (this instanceof Pilot.Data) {
         this.is_private = is_private;
         this.data = !is_private ? (cache.data[id] = cache.data[id] || {}) : {};
         this.id = id;
         return this;
     }
-    return new pilot.Data(id);
+    return new Pilot.Data(id);
 };
 
-pilot.Data.prototype = {
+Pilot.Data.prototype = {
     set: function (k, v) {
-        switch (pilot.utils.get_type(k)) {
+        switch (Pilot.utils.get_type(k)) {
             case 'string':
                 this.data[k] = v;
                 break;
             case 'object':
-                pilot.utils.extend(this.data[x], k[x]);
+                Pilot.utils.extend(this.data[x], k[x]);
                 break;
         }
-        !this.is_private && pilot.sync();
+        !this.is_private && Pilot.sync();
     },
     get: function (k) {
         return k ? this.data[k] : this.data;
     },
     remove: function (k) {
         k ? (delete this.data[k], delete cache.data[this.id][k]) : (this.data = cache.data[this.id] = {});
-        !this.is_private && pilot.sync();
+        !this.is_private && Pilot.sync();
     },
     destroy: function () {
         if (!this.is_private) {
             delete cache.data[this.id];
-            pilot.sync();
+            Pilot.sync();
         }
     }
 };
 
-// pilot.Promise is a promise framework
-pilot.Promise = function () {
-    if (this instanceof pilot.Promise) {
+// Pilot.Promise is a promise framework
+Pilot.Promise = function () {
+    if (this instanceof Pilot.Promise) {
         this.handlers = {
             success: [],
             error: [],
@@ -406,10 +406,10 @@ pilot.Promise = function () {
         };
         return this;
     }
-    return new pilot.Promise();
+    return new Pilot.Promise();
 };
 
-pilot.Promise.prototype = {
+Pilot.Promise.prototype = {
     status: 'unfulfilled', 
     then: function (success, error, progress) {
         !!success && this.add('success', success);
@@ -446,7 +446,7 @@ pilot.Promise.prototype = {
         return this;
     },
     add: function (type, callback) {
-        switch (pilot.utils.get_type(callback)) {
+        switch (Pilot.utils.get_type(callback)) {
             case 'function':
                 this.handlers[type].push(callback);
                 break;
@@ -465,37 +465,6 @@ pilot.Promise.prototype = {
     }
 };
 
-/*
-pilot.models = {
-    loaded: {},
-    instances: {},
-    load: function (id) { 
-        pilot.inject('model/' + name + '.js').then(function () {
-            var model = pilot.models.instantiate(id);
-            model.load && model.load();
-        });
-    },
-    unload: function (id) {
-        delete models.instances[id];
-    },
-    define: function (name, definition) {
-        var model = pilot.models.loaded[name] = function (id) {
-            this.id = id;
-            this.data = pilot.Data(id);
-            this.events = pilot.Pubsub(id);
-            return this;
-        };
-        model.prototype = definition();
-    },
-    instantiate: function (id) {
-        var name = id.split('.')[0],
-            models = pilot.models,
-            model = models.loaded[name];
-        return models.instances[id] || (models.instances[id] = new model(id));
-    }
-};
-*/
-
-window.pilot = window.pi = pilot;
+window.Pilot = Pilot;
 
 })(window);
