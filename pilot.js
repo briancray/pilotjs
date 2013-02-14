@@ -2,9 +2,15 @@
 "use strict";
 
 var Pilot = {
+    start: function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            Pilot.inject('lib.js');
+        });
+    },
+        
     inject: function (file) {
-        var p = Pilot.Promise(),
-            scripts = Pilot.inject.scripts || {};
+        var p = Pilot.Promise ? Pilot.Promise() : {success: function () {}},
+            scripts = Pilot.inject.scripts || (Pilot.inject.scripts = {});
         if (scripts[file]) {
             if (scripts[file] === 1) {
                 return p;

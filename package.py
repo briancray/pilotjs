@@ -2,24 +2,24 @@ import os
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 PACKAGES = (
-    'controller',
+    #'controller',
+    'promise',
     'utils',
-    'modules',
-    'scripts',
     'data',
-    'events',
-    'promises',
+    'pubsub',
+    'component',
+    'model',
 )
-MINIFY = False
+MINIFY = True
 YUI_COMPRESSOR = os.path.join(BASE_PATH, 'yuicompressor', 'yuicompressor-2.4.7.jar')
-PROD_FILE = 'controller.min.js'
+PROD_FILE = 'lib.js'
 
 def main():
-    print 'Opening controller.min.js...'
+    print 'Opening lib.js...'
     with open(os.path.join(BASE_PATH, PROD_FILE), 'w') as f:
         for package in PACKAGES:
-            with open(os.path.join(BASE_PATH, '%s/main.js' % package), 'r') as p:
-                print 'Adding %s/main.js...' % package
+            with open(os.path.join(BASE_PATH, 'lib/%s.js' % package), 'r') as p:
+                print 'Adding lib/%s.js...' % package
                 f.write(p.read() + '\n')
     print 'Files combined'
 
