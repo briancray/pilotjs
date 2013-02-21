@@ -3,12 +3,12 @@ import os
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 PACKAGES = (
     #'controller',
-    'promise',
+    #'promise',
     'utils',
     'data',
     'pubsub',
-    'component',
-    'model',
+    'widget',
+    #'model',
 )
 MINIFY = True
 YUI_COMPRESSOR = os.path.join(BASE_PATH, 'yuicompressor', 'yuicompressor-2.4.7.jar')
