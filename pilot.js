@@ -56,13 +56,12 @@ Pilot.extend = (function () {
 Pilot.factory = function (id, options) {
     var id_split = id.indexOf('.'),
         uses_namespace = id_split !== -1,
-        name = uses_namespace ? id.slice(0, id_split) : id,
+        name = Pilot.utils.capitalize(uses_namespace ? id.slice(0, id_split) : id),
         namespace = uses_namespace ? id.slice(id_split) : '',
         module = this,
         instances = module.instances;
     id = (name + namespace).toLowerCase();
     if (name) {
-        name = Pilot.utils.capitalize(name);
         if (!module[name]) {
             Pilot.inject(module.type + '/' + name.toLowerCase() + '.js', function () {
                 instances[id] = Pilot.utils.extend(new module[name](id, options), instances[id]);
