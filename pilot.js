@@ -6,7 +6,10 @@ var obj_tostring = obj.toString;
 var doc = document;
 var el_head = doc.head || doc.getElementsByTagName("head")[0] || doc.documentElement;
 var module_scripts = el_head.getElementsByClassName('pilot-module');
-var amd_path = (function (scripts) { return scripts[scripts.length - 1].src })(doc.getElementsByTagName('script'));
+var pilot_node = (function (scripts) {
+    return scripts[scripts.length - 1];
+})(doc.getElementsByTagName('script'));
+var amd_path = pilot_node.src.slice(0, pilot_node.src.lastIndexOf('/') + 1);
 
 var pilot = {};
 var exports = pilot.exports = {};
@@ -20,7 +23,7 @@ var define = pilot.define = function (id, dependencies, factory) {
     }
     else if (arg_count <= 2) {
         module_script = module_scripts[module_scripts.length - 1].src;
-        module_script = module_script.slice(amd.path.length, -3);
+        module_script = module_script.slice(amd_path.length, -3);
         if (arg_count === 1) {
             factory = id;
             id = module_script;
@@ -123,7 +126,7 @@ var require = pilot.require = function (module, callback) {
     script.type = 'text/javascript';
     script.async = true;
     script.className = 'pilot-module';
-    script.src = amd.path + module + amd.extension;
+    script.src = amd_path + module + '.js';
     el_head.appendChild(script);
 };
 
@@ -141,5 +144,7 @@ var get_type = pilot.get_type = function (v) {
 global.define = define;
 global.require = require;
 global.pilot = pilot;
+
+require(pilot_node.getAttribute('data-main'));
 
 })(this);
