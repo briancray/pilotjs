@@ -6,7 +6,6 @@ var extend = pilot.extend;
 var JSON = JSON;
 var fromJSON = JSON.parse;
 var toJSON = JSON.stringify;
-var obj_tostring = {}.toString;
 var all_data = {};
 
 var data = function (name, initial) {
@@ -28,6 +27,7 @@ var data = function (name, initial) {
     else {
         this.data = name || {};
     }
+    return this;
 };
 
 data.prototype = {
@@ -41,6 +41,7 @@ data.prototype = {
                 break;
         }
         this.sync();
+        return this;
     },
     get: function (key, default_value) {
         if (!key || key.indexOf('.') === -1) {
@@ -60,6 +61,7 @@ data.prototype = {
     remove: function (key) {
         key ? (delete this.data[key]) : (this.data = {});
         this.sync();
+        return this;
     },
     destroy: function () {
         this.data = null;
