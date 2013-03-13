@@ -5,19 +5,10 @@ var obj = {};
 var obj_tostring = obj.toString;
 var doc = document;
 var el_head = doc.head || doc.getElementsByTagName("head")[0] || doc.documentElement;
-var module_scripts = el_head.getElementsByClassName('required-module');
-var settings = {
-    amd: {
-        path: 'modules/',
-        extension: 'js'
-    }
-};
+var module_scripts = el_head.getElementsByClassName('pilot-module');
+var amd_path = (function (scripts) { return scripts[scripts.length - 1].src })(doc.getElementsByTagName('script'));
 
-var pilot = function (options) {
-    typeof options === 'object' && extend(settings, options);
-    return settings;
-};
-
+var pilot = {};
 var exports = pilot.exports = {};
 var module = pilot.module = {};
 
@@ -29,7 +20,7 @@ var define = pilot.define = function (id, dependencies, factory) {
     }
     else if (arg_count <= 2) {
         module_script = module_scripts[module_scripts.length - 1].src;
-        module_script = module_script.slice(module_script.indexOf(amd.path) + amd.path.length, -amd.extension.length);
+        module_script = module_script.slice(amd.path.length, -3);
         if (arg_count === 1) {
             factory = id;
             id = module_script;
@@ -77,7 +68,7 @@ var define = pilot.define = function (id, dependencies, factory) {
     require(dependencies, ready);
 };
 
-var amd = define.amd = settings.amd;
+define.amd = {};
 
 var require = pilot.require = function (module, callback) {
     var loaded, loaded_modules, script;
@@ -131,7 +122,7 @@ var require = pilot.require = function (module, callback) {
     };
     script.type = 'text/javascript';
     script.async = true;
-    script.className = 'required-module';
+    script.className = 'pilot-module';
     script.src = amd.path + module + amd.extension;
     el_head.appendChild(script);
 };
@@ -149,5 +140,6 @@ var get_type = pilot.get_type = function (v) {
 
 global.define = define;
 global.require = require;
+global.pilot = pilot;
 
 })(this);
