@@ -1,120 +1,153 @@
-;(function (window, undefined) {
+(function (global) {
 "use strict";
 
-var Pilot = function () {};
+var obj = {};
+var obj_tostring = obj.toString;
+var doc = document;
+var el_head = doc.head || doc.getElementsByTagName("head")[0] || doc.documentElement;
+var module_scripts = el_head.getElementsByClassName('required-module');
+var settings = {
+    amd: {
+        path: 'modules/',
+        extension: 'js'
+    }
+};
 
-Pilot.extend = (function () {
-    var initializing = false,
-        fn_test = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
+var pilot = function (options) {
+    typeof options === 'object' && extend(settings, options);
+    return settings;
+};
 
-    return function (prop) {
-        var base = this,
-            _super = base.prototype,
-            prototype = null;
+var exports = pilot.exports = {};
+var module = pilot.module = {};
 
-        initializing = true;
-        prototype = new base();
-        initializing = false;
+var define = pilot.define = function (id, dependencies, factory) {
+    var id_path_split, id_path, id_name, ready, module_script, arg_count = arguments.length;
 
-        for (var name in prop) {
-            prototype[name] = typeof prop[name] === 'function' && typeof _super[name] === 'function' && fn_test.test(prop[name]) ?
-                (function (name, fn) {
-                    return function() {
-                        var tmp = this._super;
-                        this._super = _super[name];
-                        var ret = fn.apply(this, arguments);        
-                        this._super = tmp;
-                        return ret;
-                    };
-                })(name, prop[name]) :
-                prop[name];
-        }
-
-        function Module (id, options) {
-            if (!initializing) {
-                if (this instanceof Module) {
-                    this.id = id;
-                    this.init && this.init.apply(this, arguments);
-                    return this;
-                }
-                else {
-                    return Module.factory(id, options);
-                }
-            }
-        };
-
-        Module.prototype = prototype;
-        Module.prototype.constructor = Module;
-        Module.extend = Pilot.extend;
-        Module.factory = Pilot.factory;
-        Module.instances = {};
-
-        return Module;
-    };
-})();
-
-Pilot.factory = function (id, options) {
-    var id_split = id.indexOf('.'),
-        uses_namespace = id_split !== -1,
-        name = Pilot.utils.capitalize(uses_namespace ? id.slice(0, id_split) : id),
-        namespace = uses_namespace ? id.slice(id_split) : '',
-        module = this,
-        instances = module.instances;
-    id = (name + namespace).toLowerCase();
-    if (name) {
-        if (!module[name]) {
-            Pilot.inject(module.type + '/' + name.toLowerCase() + '.js', function () {
-                instances[id] = Pilot.utils.extend(new module[name](id, options), instances[id]);
-            });
-            return instances[id] = new module(id, options);
+    if (typeof id === 'string' && exports[id].status === 2) {
+        return;
+    }
+    else if (arg_count <= 2) {
+        module_script = module_scripts[module_scripts.length - 1].src;
+        module_script = module_script.slice(module_script.indexOf(amd.path) + amd.path.length, -amd.extension.length);
+        if (arg_count === 1) {
+            factory = id;
+            id = module_script;
+            dependencies = ['require', 'exports', 'module'];
         }
         else {
-            return instances[id] = instances[id] || new module[name](id, options);
+            if (obj_tostring.call(id) === '[object Array]') {
+                factory = dependencies;
+                dependencies = id;
+                id = module_script;
+            }
+            else {
+                factory = dependencies;
+                dependencies = ['require', 'exports', 'module'];
+            }
         }
     }
-    return instances[id] = instances[id] || new module(id, options);
+
+    ready = function () {
+        var handlers = exports[id].handlers;
+        var module = exports[id] = typeof factory === 'function' ? factory.apply(null, arguments) : factory;
+        module.status = 2;
+        handlers && handlers.forEach(function (handler) {
+            handler && handler(module);
+        });
+    };
+    id_path_split = id.lastIndexOf('/'),
+    id_path = (id_path_split !== -1 ? id.slice(0, id_path_split) : '').split('/'),
+    id_name = id.slice(id_path_split + 1);
+
+    dependencies = dependencies.map(function (dependency, i) {
+        var absolute_path = ''; 
+        if (dependency.indexOf('/') === -1) {
+            absolute_path = dependency;
+        }   
+        else if (dependency.indexOf('..') === 0) {
+            absolute_path = id_path.slice(0, -1).join('/') + dependency.slice(2);
+        }   
+        else if (dependency.indexOf('.') === 0) {
+            absolute_path = id_path.join('/') + dependency.slice(1);
+        }   
+        return absolute_path || dependency;
+    }); 
+
+    require(dependencies, ready);
 };
- 
-Pilot.inject = function (file, callback) {
-    var scripts = Pilot.inject.scripts || (Pilot.inject.scripts = {});
-    if (scripts[file]) {
-        (function wait_for_inject () {
-            if (scripts[file] === 1) {
-                return window.setTimeout(wait_for_inject, 100);
-            }
-            callback && callback();
-        })();
+
+var amd = define.amd = settings.amd;
+
+var require = pilot.require = function (module, callback) {
+    var loaded, loaded_modules, script;
+
+    if (obj_tostring.call(module) === '[object Array]') {
+        loaded = 0;
+        loaded_modules = [];
+        module.filter(function (m) {
+            return m && typeof m === 'string';
+        }).forEach(function (m, i) {
+            m && typeof m === 'string' && require(m, function (def) {
+                loaded_modules[i] = def;
+                ++loaded === module.length && callback.apply(null, loaded_modules);
+            });
+        });
+        return;
     }
-    var script = document.createElement('script'),
-        when_ready = function () {
-            scripts[file] = 2;
-            callback && callback();
+    else if (!module || typeof module !== 'string') {
+        return;
+    }
+    else {
+        module = module.toLowerCase();
+        if (module === 'require' || module === 'exports' || module === 'module') {
+            callback(global[module]);
+            return;
+        }
+    }
+     
+    if (exports[module]) {
+        switch (exports[module].status) {
+            case 1:
+                callback && exports[module].handlers.push(callback);
+                break;
+            case 2:
+                callback && callback(exports[module]);
+        }
+    }
+    else {
+        exports[module] = {
+            status: 1,
+            handlers: [callback]
         };
-    scripts[file] = 1;
+    }
+
+    script = doc.createElement('script');
+    script.onload = script.onreadystatechange = function () {
+        if (!this.readyState || this.readyState === 'loaded' || this.readyState === 'complete') {
+            script.onload = script.onreadystatechange = null;
+            el_head.removeChild(script);
+        }
+    };
     script.type = 'text/javascript';
-    if (script.readyState) {
-        script.onreadystatechange = function () {
-            if (script.readyState === 'loaded' || script.readyState === 'complete') {
-                script.onreadystatechange = null;
-                when_ready();
-            }
-        };
-    }
-    else { // Others
-        script.onload = when_ready;
-    }
-    script.src = file;
-    document.head.appendChild(script);
+    script.async = true;
+    script.className = 'required-module';
+    script.src = amd.path + module + amd.extension;
+    el_head.appendChild(script);
 };
 
-Pilot.start = function () {
-    Pilot.inject('lib.js', function () {
-        Pilot.Widget.render();
-    });
+var extend = pilot.extend = function (target, source) {
+    for (var x in source) {
+        source.hasOwnProperty(x) && (target[x] = source[x]);
+    }
+    return target;
 };
 
-document.addEventListener('DOMContentLoaded', Pilot.start);
+var get_type = pilot.get_type = function (v) {
+    return obj_tostr.call(o).slice(8, -1).toLowerCase();
+};
 
-window.Pilot = Pilot;
+global.define = define;
+global.require = require;
 
-})(window);
+})(this);
