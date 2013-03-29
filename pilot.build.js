@@ -541,7 +541,7 @@ jsonp.prototype = {
         params = [];
         data = this.options.data || {};
         for (var x in data) {
-            data.hasOwnProperty(x) && (data.push(encode(x) + '=' + encode(data[x]));
+            data.hasOwnProperty(x) && (data.push(encode(x) + '=' + encode(data[x])));
         }
         this.url_params = data.join('&');
         return this;
@@ -571,7 +571,7 @@ jsonp.prototype = {
             var callback_name = call_cache.callback;
             call_cache.error.filter(function (handler) {
                 return handler(d), false;
-            }
+            });
             call_cache.success = [];
             global[callback_name] = null;
         }, this.options.timeout);
