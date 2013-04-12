@@ -9,7 +9,9 @@ def main():
 
     for lib in USE_LIBRARIES:
         with open ('lib/%s.js' % lib, 'r') as f:
-            output += f.read() + '\n'
+            contents = f.read()
+            contents = contents.replace('define(', "define('pilot/%s', " % lib)
+            output += contents + '\n'
 
     with open('pilot.build.js', 'w') as f:
         f.write(output)

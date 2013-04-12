@@ -9,32 +9,31 @@ var node = (function (scripts) {
 var main = node.getAttribute('data-main');
 var anonymous_queue = [];
 var settings = {
-    baseUrl: (function (href) {
-        var place = href.split('/').slice(0, 3).join('/');
+    baseUrl: (function (loc) {
+        var place = loc.protocol + '//' + loc.host + '/';
         var path;
         if (main) {
             if (main.slice(0, place.length) === place) {
                 path = main;
             }
-            else if (main[0] === '/') {
-                path = place + main;
-            }
             else {
-                path = href.slice(0, href.lastIndexOf('/') + 1) + main;
+                path = place + main;
             }
             main = main.slice(main.lastIndexOf('/') + 1);
         }
         else {
-            path = href;
+            path = place;
         }
         return path.slice(0, path.lastIndexOf('/') + 1);
-    })(global.location.href.split('?')[0])
+    })(global.location),
+    viewsPath: 'views/',
+    viewContext: doc.body || doc.getElementsByTagName('body')[0] || doc.documentElement
 };
 var exports = {};
 
 function config (config) {
-    extend(settings, config);
-};
+    return typeof config === 'string' ? settings.config : extend(settings, config);
+}
 
 function define (id, dependencies, factory) {
     var arg_count = arguments.length;
@@ -45,7 +44,7 @@ function define (id, dependencies, factory) {
         id = null;
     }
     else if (arg_count === 2) {
-        if (pilot.toString.call(id) === '[object Array]') {
+        if (settings.toString.call(id) === '[object Array]') {
             factory = dependencies;
             dependencies = id;
             id = null;
@@ -62,30 +61,33 @@ function define (id, dependencies, factory) {
     }
 
     function ready () {
-        var handlers = exports[id].handlers;
-        var context = exports[id].context;
-        var module = exports[id] = typeof factory === 'function' ? factory.apply(null, anonymous_queue.slice.call(arguments, 0)) || exports[id] : factory;
+        var handlers, context, module;
+        if (exports[id]) {
+            handlers = exports[id].handlers;
+            context = exports[id].context;
+        }
+        module = exports[id] = typeof factory === 'function' ? factory.apply(null, anonymous_queue.slice.call(arguments, 0)) || exports[id] || {} : factory;
         module.pilot = 2;
         module.context = context;
-        for (var x = 0, xl = handlers.length; x < xl; x++) {
+        for (var x = 0, xl = handlers ? handlers.length : 0; x < xl; x++) {
             handlers[x](module);
         }
     };
 
     require(dependencies, ready, id);
-};
+}
 
 define.amd = {
     jQuery: true
 };
 
 function require (modules, callback, context) {
-    var loaded_modules = [];
+    var loaded_modules = [], loaded_count = 0, has_loaded = false;
 
     if (typeof modules === 'string') {
         if (exports[modules] && exports[modules].pilot === 2) {
             return exports[modules];
-        }
+        }   
         throw new Error(modules + ' has not been defined. Please include it as a dependency in ' + context + '\'s define()');
         return;
     }
@@ -95,34 +97,39 @@ function require (modules, callback, context) {
             case 'require':
                 var _require = function (new_module, callback) {
                     return require(new_module, callback, context);
-                };
+                };  
                 _require.toUrl = function (module) {
                     return toUrl(module, context);
-                };
+                };  
                 loaded_modules[x] = _require;
+                loaded_count++;
                 break;
             case 'exports':
-                loaded_modules[x] = exports[context];
+                loaded_modules[x] = exports[context] || (exports[context] = {});
+                loaded_count++;
                 break;
             case 'module':
-                loaded_modules[x] = {
+                loaded_modules[x] = { 
                     id: context,
                     uri: toUrl(context)
-                };
+                };  
+                loaded_count++;
                 break;
             case exports[context] ? exports[context].context : '':
                 loaded_modules[x] = exports[exports[context].context];
+                loaded_count++;
                 break;
             default:
                 (function (x) {
                     load(modules[x], function (def) {
                         loaded_modules[x] = def;
-                        loaded_modules.length === xl && callback && callback.apply(null, loaded_modules);
+                        loaded_count++;
+                        loaded_count === xl && callback && (has_loaded = true, callback.apply(null, loaded_modules));
                     }, context);
                 })(x);
-        };
+        };  
     }
-    loaded_modules.length === xl && callback && callback.apply(null, loaded_modules);
+    !has_loaded && loaded_count === xl && callback && callback.apply(null, loaded_modules); 
 }
 
 function load (module, callback, context) {
@@ -135,6 +142,7 @@ function load (module, callback, context) {
         else {
             callback && callback(exports[module]);
         }
+        return;
     }
     else {
         exports[module] = {
@@ -151,10 +159,10 @@ function load (module, callback, context) {
             exports[module].pilot === 1 && define.apply(null, queue_item);
         }
     });
-};
+}
 
 var toUrl = require.toUrl = function (id, context) {
-    var new_context, i;
+    var new_context, i, changed;
     switch (id) {
         case 'require':
         case 'exports':
@@ -169,25 +177,13 @@ var toUrl = require.toUrl = function (id, context) {
         switch (id[0]) {
             case '..':
                 new_context.pop();
-                id.shift();
-                break;
             case '.':
             case '':
                 id.shift();
+                changed = true;
         }
     }
-    return (new_context.length ? new_context.join('/') + '/' : '') + id.join('/');
-};
-
-function extend (target, source) {
-    for (var x in source) {
-        source.hasOwnProperty(x) && (target[x] = source[x]);
-    }
-    return target;
-};
-
-function get_type (v) {
-    return pilot.toString.call(v).slice(8, -1);
+    return (new_context.length && changed ? new_context.join('/') + '/' : '') + id.join('/');
 };
 
 function inject (file, callback) {
@@ -203,7 +199,22 @@ function inject (file, callback) {
     script.async = true;
     script.src = file;
     el_head.appendChild(script);
-};
+}
+
+function extend (target, source) {
+    for (var x in source) {
+        source.hasOwnProperty(x) && (target[x] = source[x]);
+    }
+    return target;
+}
+
+function get_type (v) {
+    return pilot.toString.call(v).slice(8, -1);
+}
+
+function generate_id (prefix) {
+    return (prefix || 'instance') + '_' + Date.now() + '.' + (Math.floor(Math.random() * 900000) + 100000);
+}
 
 global.pilot = {
     config: config,
@@ -212,20 +223,21 @@ global.pilot = {
     require: global.require = require,
     exports: exports,
     get_type: get_type,
-    extend: extend
+    extend: extend,
+    generate_id: generate_id
 };
 
-main && require(main);
+main && require([main]);
 
-})(this);
+})(window);
 
-define('lib/data', function () {
+define('pilot/data', [], function () {
 "use strict";
 
 var extend = pilot.extend;
-var JSON = JSON;
-var fromJSON = JSON.parse;
-var toJSON = JSON.stringify;
+var j = JSON;
+var fromJSON = j.parse;
+var toJSON = j.stringify;
 var all_data = {};
 
 function data (name, initial) {
@@ -263,28 +275,32 @@ data.prototype = {
     },
     get: function (key, default_value) {
         var keys, current_key, current_value;
-        if (!key || key.indexOf('.') === -1) {
-            return key ? this.data[key] : this.data;
+        if (!key || typeof key !== 'string') {
+            return this.data;
+        }
+        else if (key.indexOf('.') === -1) {
+            return this.data[key];
         }
         keys = key.split('.'),
         current_key = keys[x],
         current_value = this.data;
         for (var x = 0, xl = keys.length; x < xl; current_key = keys[++x]) {                                                                                                                         
             current_value = current_value[current_key];
-            if (!current_value) {
+            if (typeof current_value === 'undefined') {
                 return default_value;
             }
         }
         return current_value;
     },
     remove: function (key) {
-        key ? (delete this.data[key]) : (this.data = {});
+        key && typeof key === 'string' ? (delete this.data[key]) : (this.data = {});
         this.sync();
         return this;
     },
     destroy: function () {
         this.data = null;
         this.sync();
+        this = null;
     },
     sync: function () {
         var data;
@@ -313,72 +329,71 @@ return data;
 
 });
 
-define('lib/pubsub', function () {
+define('pilot/pubsub', [], function () {
 "use strict";
 
 var arr_slice = Array.prototype.slice;
-var handlers = {};
+var instances = {};
+var date_now = Date.now;
 
-var pubsub = {
-    on: function (e, handler) {
-        var event_info, event_name, event_namespace;
-        if (!e || !handler) {
-            return pubsub;
-        }
-        event_info = e.split('.');
-        event_name = event_info[0];
-        event_namespace = event_info[1];
-        event_name && (handlers[event_name] = handlers[event_name] || []).push({handler: handler, retain: true, namespace: event_namespace});
-        return pubsub;
+function global_trigger () {
+    var args, id;
+    args = arr_slice.call(arguments, 0);
+    args[0] = args[0] + '.local';
+    for (id in instances) {
+        instances.hasOwnProperty(id) && instances[id].trigger.apply(instances[id], args);
+    }
+}
+
+function pubsub () {
+    if (!(this instanceof pubsub)) {
+        return new pubsub();
+    }
+    this.handlers = {};
+    this.id = pilot.generate_id('pubsub');
+    return instances[this.id] = this;
+}
+
+pubsub.prototype = {
+    on: function (e, handler, retain) {
+        retain = typeof retain === 'undefined' ? true : retain;
+        var handlers = this.handlers[e] || (this.handlers[e] = []);
+        handlers.push({handler: handler, retain: retain});
+        return this;
     },
     one: function (e, handler) {
-        var event_info, event_name, event_namespace;
-        if (!e || !handler) {
-            return pubsub;
-        }
-        event_info = e.split('.');
-        event_name = event_info[0];
-        event_namespace = event_info[1];
-        event_name && (handlers[event_name] = handlers[event_name] || []).push({handler: handler, retain: false, namespace: event_namespace});
-        return pubsub;
+        return this.on(e, handler, false);
     },
     off: function (e) {
-        var event_info, event_name, event_namespace;
-        if (!e) {
-            handlers = {};
-            return pubsub;
+        if (e && typeof e === 'string') {
+            this.handlers[e] = [];
         }
-        event_info = e.split('.');
-        event_name = event_info[0];
-        event_namespace = event_info[1];
-        function clear_namespace (h) {
-            return h.namespace !== event_namespace;
+        else if (typeof e === 'undefined') {
+            this.handlers = {};
         }
-        if (event_name) {
-            if (!event_namespace) {
-                handlers[event_name] = null;
-            }
-            else {
-                handlers[event_name] = (handlers[event_name] || []).filter(clear_namespace);
+        return this;
+    },
+    trigger: function (e) {
+        var handlers, args, ns_index;
+        if ((ns_index = e.indexOf('.local')) !== -1) {
+            args = arr_slice.call(arguments, 1);
+            e = e.slice(0, ns_index);
+            handlers = this.handlers[e];
+            if (handlers && handlers.length) {
+                this.handlers[e] = handlers.filter(function (h) {
+                    return h.handler.apply(null, args), h.retain;
+                });
             }
         }
         else {
-            for (var x in handlers) {
-                handlers.hasOwnProperty(x) && (handlers[x] = (handlers[x] || []).filter(clear_namespace));
-            }
+            args = arr_slice.call(arguments, 0);
+            global_trigger.apply(null, args);
         }
-        return pubsub;
+        return this;
     },
-    trigger: function (event_name) {
-        var args;
-        if (!e) {
-            return pubsub;
-        }
-        args = arr_slice.call(arguments, 1);
-        handlers[event_name] = (handlers[event_name] || []).filter(function (h) {
-            return h.handler.apply(null, args), h.retain;
-        });
-        return pubsub;
+    destroy: function (e) {
+        instances[this.id] = null;
+        this = null;
     }
 };
 
@@ -386,50 +401,46 @@ return pubsub;
 
 });
 
-define('lib/router', function () {
+define('pilot/router', ['pilot/pubsub'], function (pubsub) {
 
 var global = window;
 var loc = global.location;
 var root = loc.protocol + '//' + loc.host + '/';
+var root_len = root.length;
 var history = global.history;
 var get_type = pilot.get_type;
-var routes;
+var routes = [];
 var parser = {
     uri_parser: /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/,
     query_parser: /(?:^|&)([^&=]*)=?([^&]*)/g,
     key: ['source', 'protocol', 'authority', 'userInfo', 'user', 'password', 'host', 'port', 'relative', 'path', 'directory', 'file', 'query', 'anchor']
 };
+var events = pubsub();
 
-function route_click (e) {
-    var el = e.target;
-    var href = el.href;
-    var bypass;
-    if (el.tagName === 'A' && href && href.indexOf('#') !== 0) {
-        bypass = el.getAttribute('data-bypass');
-        if (href.slice(0, root.length) === root) {
-            if ((bypass && bypass === 'true') || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.alKey) {
+if (history && history.pushState) {
+    global.onpopstate = function () {
+        router.run(loc.href);
+    };
+    document.addEventListener('click', function (e) {
+        var el = e.target;
+        var href = el.href;
+        var bypass;
+        if (href && href.indexOf('#') !== 0 && href.slice(0, root_len) === root) {
+            bypass = el.getAttribute('data-bypass');
+            if ((bypass && bypass === 'true') || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
                 return;
             }
             e.preventDefault();
             router.run(href);
             history.pushState(parse(href), null, href);
         }
-    }
-}
-
-function route_loc () {
-    router.run(loc.href);
-}
-
-if (history && history.pushState) {
-    global.onpopstate = route_loc;
-    document.addEventListener('click', route_click);
+    });
 }
 
 var router = {
     add: function (route) {
-        if (get_type(route) === 'array') {
-            routes = routes.push.apply(route);
+        if (get_type(route) === 'Array') {
+            routes.push.apply(routes, route);
         }
         else {
             routes.push(route);
@@ -456,7 +467,9 @@ var router = {
     run: function (url) {
         var route = router.get(url);
         if (route) {
-            route.callback(route.params, route);
+            events.trigger('unload', route.params);
+            route.callback(route.params);
+            events.trigger('load', route.params);
         }
         return router;
     },
@@ -481,13 +494,13 @@ return router;
 
 });
 
-define('lib/jsonp', function () {
+define('pilot/jsonp', [], function () {
 "use strict";
 
 var global = window;
-var pilot = pilot;
-var inject = pilot.inject;
-var extend = pilot.extend;
+var p = pilot;
+var inject = p.inject;
+var extend = p.extend;
 var encode = global.encodeURIComponent;
 var random = Math.random;
 var cache = {};

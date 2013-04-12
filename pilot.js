@@ -9,32 +9,31 @@ var node = (function (scripts) {
 var main = node.getAttribute('data-main');
 var anonymous_queue = [];
 var settings = {
-    baseUrl: (function (href) {
-        var place = href.split('/').slice(0, 3).join('/');
+    baseUrl: (function (loc) {
+        var place = loc.protocol + '//' + loc.host + '/';
         var path;
         if (main) {
             if (main.slice(0, place.length) === place) {
                 path = main;
             }
-            else if (main[0] === '/') {
-                path = place + main;
-            }
             else {
-                path = href.slice(0, href.lastIndexOf('/') + 1) + main;
+                path = place + main;
             }
             main = main.slice(main.lastIndexOf('/') + 1);
         }
         else {
-            path = href;
+            path = place;
         }
         return path.slice(0, path.lastIndexOf('/') + 1);
-    })(global.location.href.split('?')[0])
+    })(global.location),
+    viewsPath: 'views/',
+    viewContext: doc.body || doc.getElementsByTagName('body')[0] || doc.documentElement
 };
 var exports = {};
 
 function config (config) {
-    extend(settings, config);
-};
+    return typeof config === 'string' ? settings.config : extend(settings, config);
+}
 
 function define (id, dependencies, factory) {
     var arg_count = arguments.length;
@@ -45,7 +44,7 @@ function define (id, dependencies, factory) {
         id = null;
     }
     else if (arg_count === 2) {
-        if (pilot.toString.call(id) === '[object Array]') {
+        if (settings.toString.call(id) === '[object Array]') {
             factory = dependencies;
             dependencies = id;
             id = null;
@@ -62,30 +61,33 @@ function define (id, dependencies, factory) {
     }
 
     function ready () {
-        var handlers = exports[id].handlers;
-        var context = exports[id].context;
-        var module = exports[id] = typeof factory === 'function' ? factory.apply(null, anonymous_queue.slice.call(arguments, 0)) || exports[id] : factory;
+        var handlers, context, module;
+        if (exports[id]) {
+            handlers = exports[id].handlers;
+            context = exports[id].context;
+        }
+        module = exports[id] = typeof factory === 'function' ? factory.apply(null, anonymous_queue.slice.call(arguments, 0)) || exports[id] || {} : factory;
         module.pilot = 2;
         module.context = context;
-        for (var x = 0, xl = handlers.length; x < xl; x++) {
+        for (var x = 0, xl = handlers ? handlers.length : 0; x < xl; x++) {
             handlers[x](module);
         }
     };
 
     require(dependencies, ready, id);
-};
+}
 
 define.amd = {
     jQuery: true
 };
 
 function require (modules, callback, context) {
-    var loaded_modules = [];
+    var loaded_modules = [], loaded_count = 0, has_loaded = false;
 
     if (typeof modules === 'string') {
         if (exports[modules] && exports[modules].pilot === 2) {
             return exports[modules];
-        }
+        }   
         throw new Error(modules + ' has not been defined. Please include it as a dependency in ' + context + '\'s define()');
         return;
     }
@@ -95,34 +97,39 @@ function require (modules, callback, context) {
             case 'require':
                 var _require = function (new_module, callback) {
                     return require(new_module, callback, context);
-                };
+                };  
                 _require.toUrl = function (module) {
                     return toUrl(module, context);
-                };
+                };  
                 loaded_modules[x] = _require;
+                loaded_count++;
                 break;
             case 'exports':
-                loaded_modules[x] = exports[context];
+                loaded_modules[x] = exports[context] || (exports[context] = {});
+                loaded_count++;
                 break;
             case 'module':
-                loaded_modules[x] = {
+                loaded_modules[x] = { 
                     id: context,
                     uri: toUrl(context)
-                };
+                };  
+                loaded_count++;
                 break;
             case exports[context] ? exports[context].context : '':
                 loaded_modules[x] = exports[exports[context].context];
+                loaded_count++;
                 break;
             default:
                 (function (x) {
                     load(modules[x], function (def) {
                         loaded_modules[x] = def;
-                        loaded_modules.length === xl && callback && callback.apply(null, loaded_modules);
+                        loaded_count++;
+                        loaded_count === xl && callback && (has_loaded = true, callback.apply(null, loaded_modules));
                     }, context);
                 })(x);
-        };
+        };  
     }
-    loaded_modules.length === xl && callback && callback.apply(null, loaded_modules);
+    !has_loaded && loaded_count === xl && callback && callback.apply(null, loaded_modules); 
 }
 
 function load (module, callback, context) {
@@ -135,6 +142,7 @@ function load (module, callback, context) {
         else {
             callback && callback(exports[module]);
         }
+        return;
     }
     else {
         exports[module] = {
@@ -151,10 +159,10 @@ function load (module, callback, context) {
             exports[module].pilot === 1 && define.apply(null, queue_item);
         }
     });
-};
+}
 
 var toUrl = require.toUrl = function (id, context) {
-    var new_context, i;
+    var new_context, i, changed;
     switch (id) {
         case 'require':
         case 'exports':
@@ -169,25 +177,13 @@ var toUrl = require.toUrl = function (id, context) {
         switch (id[0]) {
             case '..':
                 new_context.pop();
-                id.shift();
-                break;
             case '.':
             case '':
                 id.shift();
+                changed = true;
         }
     }
-    return (new_context.length ? new_context.join('/') + '/' : '') + id.join('/');
-};
-
-function extend (target, source) {
-    for (var x in source) {
-        source.hasOwnProperty(x) && (target[x] = source[x]);
-    }
-    return target;
-};
-
-function get_type (v) {
-    return pilot.toString.call(v).slice(8, -1);
+    return (new_context.length && changed ? new_context.join('/') + '/' : '') + id.join('/');
 };
 
 function inject (file, callback) {
@@ -203,7 +199,22 @@ function inject (file, callback) {
     script.async = true;
     script.src = file;
     el_head.appendChild(script);
-};
+}
+
+function extend (target, source) {
+    for (var x in source) {
+        source.hasOwnProperty(x) && (target[x] = source[x]);
+    }
+    return target;
+}
+
+function get_type (v) {
+    return pilot.toString.call(v).slice(8, -1);
+}
+
+function generate_id (prefix) {
+    return (prefix || 'instance') + '_' + Date.now() + '.' + (Math.floor(Math.random() * 900000) + 100000);
+}
 
 global.pilot = {
     config: config,
@@ -212,9 +223,10 @@ global.pilot = {
     require: global.require = require,
     exports: exports,
     get_type: get_type,
-    extend: extend
+    extend: extend,
+    generate_id: generate_id
 };
 
-main && require(main);
+main && require([main]);
 
-})(this);
+})(window);
