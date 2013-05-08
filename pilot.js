@@ -32,7 +32,7 @@ var settings = {
 var exports = {};
 
 function config (config) {
-    return typeof config === 'string' ? settings.config : extend(settings, config);
+    return typeof config === 'string' ? settings[config] : extend(settings, config);
 }
 
 function define (id, dependencies, factory) {

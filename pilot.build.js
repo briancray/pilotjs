@@ -32,7 +32,7 @@ var settings = {
 var exports = {};
 
 function config (config) {
-    return typeof config === 'string' ? settings.config : extend(settings, config);
+    return typeof config === 'string' ? settings[config] : extend(settings, config);
 }
 
 function define (id, dependencies, factory) {
@@ -240,29 +240,27 @@ var fromJSON = j.parse;
 var toJSON = j.stringify;
 var all_data = {};
 
-function data (name, initial) {
-    if (!(this instanceof data)) {
-        return new data(name, initial);
-    }
-    else if (typeof name === 'string') {
-        this.name = name;
-        if (all_data[name]) {
-            this.synced = true;
-            this.data = all_data[name];
-        }
-        else {
-            this.synced = false;
-            this.data = all_data[name] = initial || {};
-            this.sync();
-        }
-    }
-    else {
-        this.data = name || {};
-    }
-    return this;
-};
+function data () {}
 
 data.prototype = {
+    init: function (id, initial) {
+        if (typeof id === 'string') {
+            this.id = id;
+            if (all_data[id]) {
+                this.synced = true;
+                this.data = all_data[id];
+            }
+            else {
+                this.synced = false;
+                this.data = all_data[id] = initial || {};
+                this.sync();
+            }
+        }
+        else {
+            this.data = id || {};
+        }
+        return this;
+    },
     set: function (key, value) {
         if (typeof key === 'string') {
             this.data[key] = value;
@@ -304,22 +302,22 @@ data.prototype = {
     },
     sync: function () {
         var data;
-        if (!this.name) {
+        if (!this.id) {
             return;
         }
         else if (this.synced) {
             if (this.data) {
-                localStorage.setItem('data.' + this.name, toJSON(this.data));
-                all_data[this.name] = this.data;
+                localStorage.setItem('data.' + this.id, toJSON(this.data));
+                all_data[this.id] = this.data;
             }
             else {
-                localStorage.removeItem('data.' + this.name);
-                delete all_data[this.name];
+                localStorage.removeItem('data.' + this.id);
+                delete all_data[this.id];
             }
         }
         else {
-            data = localStorage.getItem('data' + this.name);
-            data ? (this.data = all_data[this.name] = fromJSON(data) || {}) : (this.data = all_data[this.data] = {});
+            data = localStorage.getItem('data' + this.id);
+            data ? (this.data = all_data[this.id] = fromJSON(data) || {}) : (this.data = all_data[this.data] = {});
             this.synced = true;
         }
     }
@@ -336,25 +334,14 @@ var arr_slice = Array.prototype.slice;
 var instances = {};
 var date_now = Date.now;
 
-function global_trigger () {
-    var args, id;
-    args = arr_slice.call(arguments, 0);
-    args[0] = args[0] + '.local';
-    for (id in instances) {
-        instances.hasOwnProperty(id) && instances[id].trigger.apply(instances[id], args);
-    }
-}
-
-function pubsub () {
-    if (!(this instanceof pubsub)) {
-        return new pubsub();
-    }
-    this.handlers = {};
-    this.id = pilot.generate_id('pubsub');
-    return instances[this.id] = this;
-}
+function pubsub () {}
 
 pubsub.prototype = {
+    init: function (id) {
+        this.id = typeof id === 'string' ? id : pilot.generate_id('pubsub');
+        this.handlers = {};
+        return instances[this.id] = this;
+    },
     on: function (e, handler, retain) {
         retain = typeof retain === 'undefined' ? true : retain;
         var handlers = this.handlers[e] || (this.handlers[e] = []);
@@ -387,13 +374,22 @@ pubsub.prototype = {
         }
         else {
             args = arr_slice.call(arguments, 0);
-            global_trigger.apply(null, args);
+            pubsub.trigger.apply(null, args);
         }
         return this;
     },
     destroy: function (e) {
         instances[this.id] = null;
         this = null;
+    }
+};
+
+pubsub.trigger = function () {
+    var args, id;
+    args = arr_slice.call(arguments, 0);
+    args[0] = args[0] + '.local';
+    for (id in instances) {
+        instances.hasOwnProperty(id) && instances[id].trigger.apply(instances[id], args);
     }
 };
 
@@ -415,7 +411,7 @@ var parser = {
     query_parser: /(?:^|&)([^&=]*)=?([^&]*)/g,
     key: ['source', 'protocol', 'authority', 'userInfo', 'user', 'password', 'host', 'port', 'relative', 'path', 'directory', 'file', 'query', 'anchor']
 };
-var events = pubsub();
+var events = new pubsub;
 
 if (history && history.pushState) {
     global.onpopstate = function () {
@@ -432,7 +428,7 @@ if (history && history.pushState) {
             }
             e.preventDefault();
             router.run(href);
-            history.pushState(parse(href), null, href);
+            history.pushState(router.parse(href), null, href);
         }
     });
 }
@@ -494,114 +490,55 @@ return router;
 
 });
 
-define('pilot/jsonp', [], function () {
+define('pilot/view', ['pilot/pubsub', 'pilot/data'], function (pubsub, data) {
 "use strict";
 
-var global = window;
-var p = pilot;
-var inject = p.inject;
-var extend = p.extend;
-var encode = global.encodeURIComponent;
-var random = Math.random;
-var cache = {};
+var arr_foreach = Array.prototype.forEach;
 
-function noop () {}
+function view () {}
 
-function jsonp (options, callback) {
-    if (!(this instanceof jsonp)) {
-        return new jsonp(options, callback);
-    }
-    else if (typeof options === 'string') {
-        options = {
-            url: options,
-            success: callback
-        };
-    }
-    this.options = extend(options, jsonp.defaults);
-    this.call();
-    return this;
-};
-
-jsonp.prototype = {
-    create_url: function () {
-        var url = this.options.url;
-        this.stringify_data();
-        this.request_url = url + (this.url_params ? (url.indexOf('?') === -1 ? '?' : '&') + this.url_params : '');
+view.prototype = {
+    init: function (el, params) {
+        this.el = el;
+        this.id = el.getAttribute('data-view') || '';
+        this.id = this.id.indexOf('!') !== -1 ? this.id.split('!')[0] : this.id;
+        this.params = params;
+        this.events = new pubsub().init(this.id);
+        this.data = new data().init(this.id);
+        this.app_events();
+        this.dom_events();
+        this.render();
         return this;
     },
-    create_callback: function () {
-        var url = this.request_url;
-        this.call_timestamp = Date.now()
-        this.callback_name = 'jsonp_' + this.call_timestamp + '_' + Math.floor(random() * 999);
-        global[this.callback_name] = function (d) {
-            var call_cache = cache[this.request_url];
-            global.clearTimeout(call_cache.timeout);
-            call_cache.data = cache[this.request_url].cache && d;
-            call_cache.success.filter(function (handler) {
-                return handler(d), false;
-            });
-            call_cache.error = [];
-            global[this.callback_name] = null;
-        };
-        this.full_url = url + (url.indexOf('?') === -1 ? '?' : '&') + this.options.callback_param + '=' + this.callback_name;
-        return this;
+    app_events: function () {
     },
-    stringify_data: function () {
-        var params, data;
-        if (!this.options.data) {
-            return '';
-        }
-        params = [];
-        data = this.options.data || {};
-        for (var x in data) {
-            data.hasOwnProperty(x) && (data.push(encode(x) + '=' + encode(data[x])));
-        }
-        this.url_params = data.join('&');
-        return this;
+    dom_events: function () {
     },
-    call: function () {
-        var call_cache, cached_data, cached_success;
-        this.create_url();
-        call_cache = cache[this.request_url];
-        if ((cached_success = call_cache.success).length) {
-            cached_success.push(this.success);
-            call_cache.errors.push(this.error);
-            return;
-        }
-        else if (cached_data = call_cache.data) {
-            this.success(cached_data);
-            return;
-        }
-        this.create_callback();
-        call_cache = cache[this.request_url] = {
-            success: [this.success],
-            error: [this.error],
-            cache: this.options.cache,
-            callback: this.callback_name
-        };
-        inject(this.full_url);
-        call_cache.timeout = global.setTimeout(function () {
-            var callback_name = call_cache.callback;
-            call_cache.error.filter(function (handler) {
-                return handler(d), false;
-            });
-            call_cache.success = [];
-            global[callback_name] = null;
-        }, this.options.timeout);
+    render: function () {
+        this.el.innerHTML = this.generate();
+        this.init_subviews();
+    },
+    generate: function () {
+        return '';
+    },
+    init_subviews: function (subviews) {
+        var module = this;
+        arr_foreach.call(module.el.getElementsByClassName('view'), function (el_view) {
+            var data_view = el_view.getAttribute('data-view') || '';
+            if (data_view) {
+                data_view = data_view.indexOf('!') !== -1 ? data_view.split('!')[1] : data_view;
+                require([data_view], function (view_module) {
+                    new view_module().init(el_view, module.params);
+                });
+            }
+        });
+    },
+    destroy: function () {
+        this.events.destroy();
     }
 };
 
-jsonp.defaults = {
-    url: '',
-    callback_param: 'callback',
-    success: noop,
-    error: noop,
-    data: null,
-    timeout: 5000,
-    cache: true
-};
-
-return jsonp;
+return view;
 
 });
 

@@ -1,16 +1,21 @@
 define(['pilot/router'], function (router) {
+    "use strict";
 
     var main = pilot.config('viewContext');
-    console.log(main);
 
-    router.add({route: /^\/Users\/briancray\/Sites\/pilotjs\/tests\/index\.html$/, callback: index});
+    router.add({route: /^\/$/, callback: index});
+    router.add({route: /^\/page2\/?$/, callback: page2});
 
-    function index () {
-        main.innerHTML = 'Index | <a href="/mypage">My Page</a>';
+    function index (params) {
+        require(['views/index'], function (view) {
+            new view().init(main, params);
+        });
     }
 
-    function my_page () {
-        main.innerHTML = '<a href="/">Index</a> | My Page';
+    function page2 (params) {
+        require(['views/page2'], function (view) {
+            new view().init(main, params);
+        });
     }
 });
 

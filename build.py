@@ -1,4 +1,4 @@
-USE_LIBRARIES = ('data', 'pubsub', 'router', 'jsonp')
+USE_LIBRARIES = ('data', 'pubsub', 'router','view',)
 NEW_FILE = 'pilot.build.js'
 
 def main():
