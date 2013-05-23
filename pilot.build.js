@@ -298,7 +298,6 @@ data.prototype = {
     destroy: function () {
         this.data = null;
         this.sync();
-        this = null;
     },
     sync: function () {
         var data;
@@ -380,7 +379,6 @@ pubsub.prototype = {
     },
     destroy: function (e) {
         instances[this.id] = null;
-        this = null;
     }
 };
 
