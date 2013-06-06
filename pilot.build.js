@@ -8,6 +8,7 @@ var node = (function (scripts) {
 })(doc.getElementsByTagName('script'));
 var main = node.getAttribute('data-main');
 var anonymous_queue = [];
+var arr_slice = Array.prototype.slice;
 var settings = {
     baseUrl: (function (loc) {
         var place = loc.protocol + '//' + loc.host + '/';
@@ -202,8 +203,12 @@ function inject (file, callback) {
 }
 
 function extend (target, source) {
-    for (var x in source) {
-        source.hasOwnProperty(x) && (target[x] = source[x]);
+    var sources = arr_slice.call(arguments, 1);
+    var l = sources.length;
+    while (l-- > -1) {
+        for (var x in sources[l]) {
+            sources[l].hasOwnProperty(x) && (target[x] = sources[l][x]);
+        }
     }
     return target;
 }
