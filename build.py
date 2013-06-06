@@ -1,7 +1,7 @@
 import os, re
 
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-LIBRARIES = ('data', 'pubsub', 'router','view',)
+LIBRARIES = ('model', 'pubsub', 'router','view',)
 NEW_FILE = 'pilot.build.js'
 
 try:

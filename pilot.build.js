@@ -231,7 +231,7 @@ main && require([main]);
 
 })(window);
 
-define('pilot/data', [], function () {
+define('pilot/model', [], function () {
 "use strict";
 
 var extend = pilot.extend;
@@ -240,9 +240,9 @@ var fromJSON = j.parse;
 var toJSON = j.stringify;
 var all_data = {};
 
-function data () {}
+function model () {}
 
-data.prototype = {
+model.prototype = {
     init: function (id, initial) {
         if (typeof id === 'string') {
             this.id = id;
@@ -322,7 +322,7 @@ data.prototype = {
     }
 };
 
-return data;
+return model;
 
 });
 
@@ -488,7 +488,7 @@ return router;
 
 });
 
-define('pilot/view', ['pilot/pubsub', 'pilot/data'], function (pubsub, data) {
+define('pilot/view', ['pilot/pubsub', 'pilot/model'], function (pubsub, model) {
 "use strict";
 
 var arr_foreach = Array.prototype.forEach;
@@ -502,7 +502,7 @@ view.prototype = {
         this.id = this.id.indexOf('!') !== -1 ? this.id.split('!')[0] : this.id;
         this.params = params;
         this.events = new pubsub().init(this.id);
-        this.data = new data().init(this.id);
+        this.model = new model().init(this.id);
         this.app_events();
         this.dom_events();
         this.render();
