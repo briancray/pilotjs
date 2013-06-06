@@ -224,6 +224,13 @@ function generate_id (prefix) {
 
 function render (context, params) {
     context = typeof context === 'string' ? doc.querySelector(context) : context;
+    params = typeof params === 'object' ? params || {};
+    var url_params = {};
+    window.location.search.slice(1).split('&').forEach(function (param) {
+        var key_val = param.split('=');
+        url_params[decodeURIComponent(key_val[0])] = decodeURIComponent(key_val.slice(1).join(''));
+    });
+    params = extend(url_params, params);
     arr_foreach.call(context.getElementsByClassName('view'), function (el_view) {
         var data_view = el_view.getAttribute('data-view') || '';
         data_view && require([data_view.split('.')[0]], function (view_module) {
