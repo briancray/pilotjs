@@ -8,7 +8,8 @@ var node = (function (scripts) {
 })(doc.getElementsByTagName('script'));
 var main = node.getAttribute('data-main');
 var anonymous_queue = [];
-var arr_slice = Array.prototype.slice;
+var arr_slice = anonymous_queue.slice;
+var arr_foreach = anonymous_queue.forEach;
 var settings = {
     baseUrl: (function (loc) {
         var place = loc.protocol + '//' + loc.host + '/';
@@ -221,6 +222,16 @@ function generate_id (prefix) {
     return (prefix || 'instance') + '_' + Date.now() + '.' + (Math.floor(Math.random() * 900000) + 100000);
 }
 
+function render (context, params) {
+    context = typeof context === 'string' ? doc.querySelector(context) : context;
+    arr_foreach.call(context.getElementsByClassName('view'), function (el_view) {
+        var data_view = el_view.getAttribute('data-view') || '';
+        data_view && require([data_view.split('.')[0]], function (view_module) {
+            new view_module().init(el_view, params);
+        });
+    });
+}
+
 global.pilot = {
     config: config,
     inject: inject,
@@ -229,7 +240,8 @@ global.pilot = {
     exports: exports,
     get_type: get_type,
     extend: extend,
-    generate_id: generate_id
+    generate_id: generate_id,
+    render: render
 };
 
 main && require([main]);
