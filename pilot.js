@@ -2,14 +2,14 @@
 "use strict";
 
 var doc = document;
-var el_head = doc.head || doc.getElementsByTagName("head")[0] || doc.documentElement;
+var elHead = doc.head || doc.getElementsByTagName("head")[0] || doc.documentElement;
 var node = (function (scripts) {
     return scripts[scripts.length - 1];
 })(doc.getElementsByTagName('script'));
 var main = node.getAttribute('data-main');
-var anonymous_queue = [];
-var arr_slice = anonymous_queue.slice;
-var arr_foreach = anonymous_queue.forEach;
+var anonymousQueue = [];
+var arrSlice = anonymousQueue.slice;
+var arrForEach = anonymousQueue.forEach;
 var settings = {
     baseUrl: (function (loc) {
         var place = loc.protocol + '//' + loc.host + '/';
@@ -38,14 +38,14 @@ function config (config) {
 }
 
 function define (id, dependencies, factory) {
-    var arg_count = arguments.length;
+    var argCount = arguments.length;
 
-    if (arg_count === 1) {
+    if (argCount === 1) {
         factory = id;
         dependencies = ['require', 'exports', 'module'];
         id = null;
     }
-    else if (arg_count === 2) {
+    else if (argCount === 2) {
         if (settings.toString.call(id) === '[object Array]') {
             factory = dependencies;
             dependencies = id;
@@ -58,7 +58,7 @@ function define (id, dependencies, factory) {
     }
 
     if (!id) {
-        anonymous_queue.push([dependencies, factory]);
+        anonymousQueue.push([dependencies, factory]);
         return;
     }
 
@@ -68,7 +68,7 @@ function define (id, dependencies, factory) {
             handlers = exports[id].handlers;
             context = exports[id].context;
         }
-        module = exports[id] = typeof factory === 'function' ? factory.apply(null, anonymous_queue.slice.call(arguments, 0)) || exports[id] || {} : factory;
+        module = exports[id] = typeof factory === 'function' ? factory.apply(null, anonymousQueue.slice.call(arguments, 0)) || exports[id] || {} : factory;
         module.pilot = 2;
         module.context = context;
         for (var x = 0, xl = handlers ? handlers.length : 0; x < xl; x++) {
@@ -84,12 +84,12 @@ define.amd = {
 };
 
 function require (modules, callback, context) {
-    var loaded_modules = [], loaded_count = 0, has_loaded = false;
+    var loadedModules = [], loadedCount = 0, hasLoaded = false;
 
     if (typeof modules === 'string') {
         if (exports[modules] && exports[modules].pilot === 2) {
             return exports[modules];
-        }   
+        }
         throw new Error(modules + ' has not been defined. Please include it as a dependency in ' + context + '\'s define()');
         return;
     }
@@ -97,46 +97,46 @@ function require (modules, callback, context) {
     for (var x = 0, xl = modules.length; x < xl; x++) {
         switch (modules[x]) {
             case 'require':
-                var _require = function (new_module, callback) {
-                    return require(new_module, callback, context);
-                };  
+                var _require = function (newModule, callback) {
+                    return require(newModule, callback, context);
+                };
                 _require.toUrl = function (module) {
                     return toUrl(module, context);
-                };  
-                loaded_modules[x] = _require;
-                loaded_count++;
+                };
+                loadedModules[x] = _require;
+                loadedCount++;
                 break;
             case 'exports':
-                loaded_modules[x] = exports[context] || (exports[context] = {});
-                loaded_count++;
+                loadedModules[x] = exports[context] || (exports[context] = {});
+                loadedCount++;
                 break;
             case 'module':
-                loaded_modules[x] = { 
+                loadedModules[x] = {
                     id: context,
                     uri: toUrl(context)
-                };  
-                loaded_count++;
+                };
+                loadedCount++;
                 break;
             case exports[context] ? exports[context].context : '':
-                loaded_modules[x] = exports[exports[context].context];
-                loaded_count++;
+                loadedModules[x] = exports[exports[context].context];
+                loadedCount++;
                 break;
             default:
                 (function (x) {
                     load(modules[x], function (def) {
-                        loaded_modules[x] = def;
-                        loaded_count++;
-                        loaded_count === xl && callback && (has_loaded = true, callback.apply(null, loaded_modules));
+                        loadedModules[x] = def;
+                        loadedCount++;
+                        loadedCount === xl && callback && (hasLoaded = true, callback.apply(null, loadedModules));
                     }, context);
                 })(x);
-        };  
+        };
     }
-    !has_loaded && loaded_count === xl && callback && callback.apply(null, loaded_modules); 
+    !hasLoaded && loadedCount === xl && callback && callback.apply(null, loadedModules);
 }
 
 function load (module, callback, context) {
     module = context ? toUrl(module, context) : module;
-     
+
     if (exports[module]) {
         if (exports[module].pilot === 1) {
             callback && exports[module].handlers.push(callback);
@@ -153,39 +153,39 @@ function load (module, callback, context) {
             context: context
         };
     }
-    
+
     inject(toUrl(module) + '.js', function () {
-        var queue_item;
-        if (queue_item = anonymous_queue.shift()) {
-            queue_item.unshift(module);
-            exports[module].pilot === 1 && define.apply(null, queue_item);
+        var queueItem;
+        if (queueItem = anonymousQueue.shift()) {
+            queueItem.unshift(module);
+            exports[module].pilot === 1 && define.apply(null, queueItem);
         }
     });
 }
 
 var toUrl = require.toUrl = function (id, context) {
-    var new_context, i, changed;
+    var newContext, i, changed;
     switch (id) {
         case 'require':
         case 'exports':
         case 'module':
             return id;
     }
-    new_context = (context || settings.baseUrl).split('/');
-    new_context.pop();
+    newContext = (context || settings.baseUrl).split('/');
+    newContext.pop();
     id = id.split('/');
     i = id.length;
     while (--i) {
         switch (id[0]) {
             case '..':
-                new_context.pop();
+                newContext.pop();
             case '.':
             case '':
                 id.shift();
                 changed = true;
         }
     }
-    return (new_context.length && changed ? new_context.join('/') + '/' : '') + id.join('/');
+    return (newContext.length && changed ? newContext.join('/') + '/' : '') + id.join('/');
 };
 
 function inject (file, callback) {
@@ -193,18 +193,18 @@ function inject (file, callback) {
     script.onload = script.onreadystatechange = function () {
         if (!this.readyState || this.readyState === 'loaded' || this.readyState === 'complete') {
             script.onload = script.onreadystatechange = null;
-            el_head.removeChild(script);
+            elHead.removeChild(script);
             callback && callback();
         }
     };
     script.type = 'text/javascript';
     script.async = true;
     script.src = file;
-    el_head.appendChild(script);
+    elHead.appendChild(script);
 }
 
 function extend (target, source) {
-    var sources = arr_slice.call(arguments, 1);
+    var sources = arrSlice.call(arguments, 1);
     var l = sources.length;
     while (l-- > -1) {
         for (var x in sources[l]) {
@@ -214,11 +214,11 @@ function extend (target, source) {
     return target;
 }
 
-function get_type (v) {
+function getType (v) {
     return pilot.toString.call(v).slice(8, -1);
 }
 
-function generate_id (prefix) {
+function generateId (prefix) {
     return (prefix || 'instance') + '_' + Date.now() + '.' + (Math.floor(Math.random() * 900000) + 100000);
 }
 
@@ -228,9 +228,9 @@ global.pilot = {
     define: global.define = define,
     require: global.require = require,
     exports: exports,
-    get_type: get_type,
+    getType: getType,
     extend: extend,
-    generate_id: generate_id
+    generateId: generateId
 };
 
 main && require([main]);
